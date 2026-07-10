@@ -9,16 +9,28 @@ class GeminiService {
 
   Future<String> generateResponse(List<Content> conversation) async {
     try {
-      final response = await _model.generateContent(conversation);
+      final response = await _model
+          .generateContent(conversation)
+          .timeout(const Duration(seconds: 30));
 
       return response.text ?? "Sorry, I couldn't generate a response.";
     } on GenerativeAIException catch (e) {
-      if (e.message.contains('503') || e.message.contains('UNAVAILABLE')) {
-        return '⚠️ Gemini server is busy right now. Please try again in a few seconds.';
+      final error = e.message;
+
+      if (error.contains('503') || error.contains('UNAVAILABLE')) {
+        return '⚠️ Gemini server is busy.\nPlease try again in a few seconds.';
       }
-      return '⚠️ Gemini API Error: ${e.message}';
+
+      if (error.contains('429') ||
+          error.toLowerCase().contains('quota') ||
+          error.toLowerCase().contains('rate limit')) {
+        return '⚠️ Request limit reached.\nPlease wait a few seconds and try again.';
+        
+      }
+
+      return '⚠️ Unable to contact Gemini.\nPlease try again later.';
     } catch (_) {
-      return '⚠️ Something went wrong. Please check your internet connection and API key, then try again.';
+      return '⚠️ Something went wrong.\nPlease check your internet connection.';
     }
   }
 }

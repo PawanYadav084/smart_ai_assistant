@@ -26,6 +26,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _sendMessage() async {
     final message = _controller.text.trim();
+    if (_isTyping) return;
 
     if (message.isEmpty) return;
 
@@ -39,8 +40,8 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       _conversation.add(Content.text(message));
       _isTyping = true;
-      _scrollToBottom();
     });
+    _scrollToBottom();
 
     _controller.clear();
 
@@ -49,24 +50,42 @@ class _ChatScreenState extends State<ChatScreen> {
 
       if (!mounted) return;
 
-      setState(() {
-        _messages.add(
-          ChatMessage(
-            message: reply,
-            isUser: false,
-            time: DateTime.now(),
-          ),
-        );
-        _conversation.add(
-          Content.model([
-            TextPart(reply),
-          ]),
-        );
+      // Streaming effect for AI response
+      _messages.add(
+        ChatMessage(
+          message: '',
+          isUser: false,
+          time: DateTime.now(),
+        ),
+      );
 
+      final words = reply.split(' ');
+
+      for (int i = 0; i < words.length; i++) {
+        if (!mounted) return;
+
+        await Future.delayed(const Duration(milliseconds: 35));
+
+        setState(() {
+          final current = _messages.last;
+
+          _messages[_messages.length - 1] = ChatMessage(
+            message: current.message.isEmpty
+                ? words[i]
+                : '${current.message} ${words[i]}',
+            isUser: false,
+            time: current.time,
+          );
+        });
+
+        _scrollToBottom();
+      }
+
+      _conversation.add(Content.model([TextPart(reply)]));
+
+      setState(() {
         _isTyping = false;
       });
-
-      _scrollToBottom();
     } catch (e) {
       if (!mounted) return;
 
@@ -105,6 +124,29 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  void _showClearChatDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Start New Chat?'),
+        content: const Text('This will clear your current conversation.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _clearChat();
+            },
+            child: const Text('New Chat'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -113,7 +155,7 @@ class _ChatScreenState extends State<ChatScreen> {
         centerTitle: true,
         actions: [
           IconButton(
-            onPressed: _clearChat,
+            onPressed: _showClearChatDialog,
             icon: const Icon(Icons.delete_outline),
             tooltip: "New Chat",
           ),
@@ -196,6 +238,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   Expanded(
                     child: TextField(
                       controller: _controller,
+                      enabled: !_isTyping,
                       onSubmitted: (_) => _sendMessage(),
                       textInputAction: TextInputAction.send,
                       textCapitalization: TextCapitalization.sentences,
@@ -218,7 +261,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     radius: 26,
                     backgroundColor: const Color(0xFF2575FC),
                     child: IconButton(
-                      onPressed: _sendMessage,
+                      onPressed: _isTyping ? null : _sendMessage,
                       icon: const Icon(
                         Icons.send,
                         color: Colors.white,
@@ -232,5 +275,12 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 }
