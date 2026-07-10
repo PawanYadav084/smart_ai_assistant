@@ -30,6 +30,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_markdown: ^0.7.3
+  flutter_highlight: ^0.7.0
+  highlight: ^0.7.0
+
 
 
 
@@ -38,7 +42,6 @@ dependencies:
   cupertino_icons: ^1.0.8
   google_generative_ai: ^0.4.7
   flutter_dotenv: ^5.2.1
-  flutter_markdown: ^0.7.3
 
 dev_dependencies:
   flutter_test:

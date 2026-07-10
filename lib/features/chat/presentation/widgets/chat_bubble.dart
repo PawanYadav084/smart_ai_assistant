@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'markdown_message.dart';
 import '../../../../models/chat_message.dart';
 
 class ChatBubble extends StatelessWidget {
@@ -58,14 +58,9 @@ class ChatBubble extends StatelessWidget {
                 //     fontSize: 16,
                 //   ),
                 // ),
-                MarkdownBody(
-                  data: chat.message,
-                  styleSheet: MarkdownStyleSheet(
-                    p: TextStyle(
-                      color: chat.isUser ? Colors.white : Colors.black,
-                      fontSize: 16,
-                    ),
-                  ),
+                MarkdownMessage(
+                  text: chat.message,
+                  textColor: chat.isUser ? Colors.white : Colors.black,
                 ),
                 const SizedBox(height: 6),
                 Text(
