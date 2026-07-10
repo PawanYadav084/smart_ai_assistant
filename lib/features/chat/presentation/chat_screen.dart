@@ -1,7 +1,9 @@
+import 'widgets/typing_indicator.dart';
 import 'widgets/chat_bubble.dart';
 import '../../../models/chat_message.dart';
 import 'package:flutter/material.dart';
-
+import '../../../core/services/gemini_service.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -17,9 +19,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
   final List<ChatMessage> _messages = [];
 
+  final GeminiService _geminiService = GeminiService();
+  final List<Content> _conversation = [];
+
   bool _isTyping = false;
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final message = _controller.text.trim();
 
     if (message.isEmpty) return;
@@ -32,28 +37,51 @@ class _ChatScreenState extends State<ChatScreen> {
           time: DateTime.now(),
         ),
       );
+      _conversation.add(Content.text(message));
       _isTyping = true;
       _scrollToBottom();
     });
 
     _controller.clear();
 
-    Future.delayed(const Duration(seconds: 2), () {
+    try {
+      final reply = await _geminiService.generateResponse(_conversation);
+
       if (!mounted) return;
 
       setState(() {
         _messages.add(
           ChatMessage(
-            message: "Hello Pawan 👋\nHow can I help you today?",
+            message: reply,
+            isUser: false,
+            time: DateTime.now(),
+          ),
+        );
+        _conversation.add(
+          Content.model([
+            TextPart(reply),
+          ]),
+        );
+
+        _isTyping = false;
+      });
+
+      _scrollToBottom();
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _messages.add(
+          ChatMessage(
+            message: 'Error: Unable to get AI response.',
             isUser: false,
             time: DateTime.now(),
           ),
         );
 
         _isTyping = false;
-        _scrollToBottom();
       });
-    });
+    }
   }
 
   void _scrollToBottom() {
@@ -68,12 +96,28 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  void _clearChat() {
+    setState(() {
+      _messages.clear();
+      _conversation.clear();
+      _isTyping = false;
+      _controller.clear();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Smart AI Chat"),
         centerTitle: true,
+        actions: [
+          IconButton(
+            onPressed: _clearChat,
+            icon: const Icon(Icons.delete_outline),
+            tooltip: "New Chat",
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(
@@ -127,23 +171,20 @@ class _ChatScreenState extends State<ChatScreen> {
                 return ChatBubble(chat: chat);
               },
             ),
-    ),
-    if (_isTyping)
-      const Padding(
-        padding: EdgeInsets.only(left: 16, bottom: 12),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            "🤖 Typing...",
-            style: TextStyle(
-              color: Colors.grey,
-              fontStyle: FontStyle.italic,
-            ),
           ),
-        ),
-      ),
-  ],
-),
+                  if (_isTyping)
+                    const Padding(
+                      padding: EdgeInsets.only(
+                      left: 16,
+                      bottom: 12,
+                    ),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: TypingIndicator(),
+                    ),
+                  ),
+                ],
+              ),
             ),
 
             // Message Box
