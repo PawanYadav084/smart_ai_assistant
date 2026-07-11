@@ -2,11 +2,14 @@ import 'widgets/typing_indicator.dart';
 import 'widgets/chat_bubble.dart';
 import '../../../models/chat_message.dart';
 import 'package:flutter/material.dart';
-import '../../../core/services/gemini_service.dart';
+// import '../../../core/services/gemini_service.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../../../core/memory/memory_parser.dart';
 import '../../../core/memory/memory_service.dart';
-
+import '../../../database/chat_repository.dart';
+import '../../../database/chat_history.dart';
+import '../../../core/services/groq_service.dart';
+import '../../../core/services/ai_service.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -22,8 +25,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   final List<ChatMessage> _messages = [];
 
-  final GeminiService _geminiService = GeminiService();
+  final AIService _aiService = GroqService(); // Switch between services
   final MemoryService _memoryService = MemoryService();
+  final ChatRepository _chatRepository = ChatRepository();
   final List<Content> _conversation = [];
 
   bool _isTyping = false;
@@ -50,6 +54,13 @@ class _ChatScreenState extends State<ChatScreen> {
       _conversation.add(Content.text(message));
       _isTyping = true;
     });
+    await _chatRepository.saveMessage(
+      ChatHistory(
+        message: message,
+        isUser: true,
+        timestamp: DateTime.now(),
+      ),
+    );
     _scrollToBottom();
 
     _controller.clear();
@@ -70,7 +81,7 @@ class _ChatScreenState extends State<ChatScreen> {
         Content.text(memoryPrompt),
         ..._conversation,
       ];
-      final reply = await _geminiService.generateResponse(requestConversation);
+      final reply = await _aiService.generateResponse(requestConversation);
 
       if (!mounted) return;
 
@@ -105,12 +116,21 @@ class _ChatScreenState extends State<ChatScreen> {
         _scrollToBottom();
       }
 
+      await _chatRepository.saveMessage(
+        ChatHistory(
+          message: reply,
+          isUser: false,
+          timestamp: DateTime.now(),
+        ),
+      );
       _conversation.add(Content.model([TextPart(reply)]));
 
       setState(() {
         _isTyping = false;
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint("ERROR: $e");
+      debugPrintStack(stackTrace: stackTrace);
       if (!mounted) return;
 
       setState(() {
