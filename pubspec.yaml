@@ -33,7 +33,7 @@ dependencies:
   flutter_markdown: ^0.7.3
   flutter_highlight: ^0.7.0
   highlight: ^0.7.0
-
+  shared_preferences: ^2.5.3
 
 
 

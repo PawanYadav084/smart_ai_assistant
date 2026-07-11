@@ -1,6 +1,8 @@
 
 
 import 'package:flutter/material.dart';
+import 'package:flutter_highlight/flutter_highlight.dart';
+import 'package:flutter_highlight/themes/atom-one-dark.dart';
 
 import 'copy_button.dart';
 
@@ -52,10 +54,12 @@ class CodeBlock extends StatelessWidget {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.all(16),
-            child: SelectableText(
+            child: HighlightView(
               code,
-              style: const TextStyle(
-                color: Colors.white,
+              language: language.toLowerCase() == 'code' ? 'dart' : language.toLowerCase(),
+              theme: atomOneDarkTheme,
+              padding: EdgeInsets.zero,
+              textStyle: const TextStyle(
                 fontFamily: 'monospace',
                 fontSize: 14,
                 height: 1.5,

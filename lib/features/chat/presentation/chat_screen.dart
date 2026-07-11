@@ -4,6 +4,9 @@ import '../../../models/chat_message.dart';
 import 'package:flutter/material.dart';
 import '../../../core/services/gemini_service.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import '../../../core/memory/memory_parser.dart';
+import '../../../core/memory/memory_service.dart';
+
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -20,12 +23,18 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<ChatMessage> _messages = [];
 
   final GeminiService _geminiService = GeminiService();
+  final MemoryService _memoryService = MemoryService();
   final List<Content> _conversation = [];
 
   bool _isTyping = false;
 
   Future<void> _sendMessage() async {
     final message = _controller.text.trim();
+    final memory = MemoryParser.extractMemory(message);
+
+    if (memory.isNotEmpty) {
+    await _memoryService.saveMemory(memory);
+    }
     if (_isTyping) return;
 
     if (message.isEmpty) return;
@@ -46,7 +55,22 @@ class _ChatScreenState extends State<ChatScreen> {
     _controller.clear();
 
     try {
-      final reply = await _geminiService.generateResponse(_conversation);
+      final savedMemory = await _memoryService.loadMemory();
+
+      final memoryPrompt = '''
+      User Information:
+      Name: ${savedMemory['name']}
+      City: ${savedMemory['city']}
+      Profession: ${savedMemory['profession']}
+      Favorite Language: ${savedMemory['language']}
+
+      Use this information only if it is relevant to the user's request.
+      ''';
+      final requestConversation = [
+        Content.text(memoryPrompt),
+        ..._conversation,
+      ];
+      final reply = await _geminiService.generateResponse(requestConversation);
 
       if (!mounted) return;
 
