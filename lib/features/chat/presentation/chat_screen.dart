@@ -8,8 +8,15 @@ import '../../../core/memory/memory_parser.dart';
 import '../../../core/memory/memory_service.dart';
 import '../../../database/chat_repository.dart';
 import '../../../database/chat_history.dart';
+import '../../../database/conversation.dart';
+import '../../../database/conversation_repository.dart';
 import '../../../core/services/groq_service.dart';
 import '../../../core/services/ai_service.dart';
+import '../../../core/services/fallback_ai_service.dart';
+import '../../../core/config/app_config.dart';
+
+
+
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -25,23 +32,84 @@ class _ChatScreenState extends State<ChatScreen> {
 
   final List<ChatMessage> _messages = [];
 
-  final AIService _aiService = GroqService(); // Switch between services
+  late AIService _aiService;
   final MemoryService _memoryService = MemoryService();
   final ChatRepository _chatRepository = ChatRepository();
   final List<Content> _conversation = [];
+  List<Conversation> _conversations = [];
+  int _currentConversationId = 1;
+  final ConversationRepository _conversationRepository = ConversationRepository();
 
   bool _isTyping = false;
 
+  @override
+  void initState() {
+    super.initState();
+
+    switch (AppConfig.provider) {
+      case AIProvider.gemini:
+        _aiService = FallbackAIService();
+        break;
+
+      case AIProvider.groq:
+        _aiService = GroqService();
+        break;
+    }
+
+    _loadChatHistory();
+    _loadConversations();
+  }
+
+  Future<void> _loadChatHistory() async {
+    final chatHistory = await _chatRepository.getMessages(_currentConversationId);
+
+    if (!mounted) return;
+
+    setState(() {
+      chatHistory.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+      if (_messages.isEmpty) {
+        _messages.clear();
+        _conversation.clear();
+
+        for (final history in chatHistory) {
+          _messages.add(
+            ChatMessage(
+              message: history.message,
+              isUser: history.isUser,
+              time: history.timestamp,
+            ),
+          );
+
+          _conversation.add(
+            history.isUser
+              ? Content.text(history.message)
+              : Content.model([TextPart(history.message)]),
+          );
+        }
+      }
+    });
+
+    _scrollToBottom();
+  }
+
+  Future<void> _loadConversations() async {
+    final conversations = await _conversationRepository.getAllConversations();
+    if (!mounted) return;
+    setState(() {
+      _conversations = conversations;
+    });
+  }
+
   Future<void> _sendMessage() async {
     final message = _controller.text.trim();
+    if (_isTyping) return;
+    if (message.isEmpty) return;
     final memory = MemoryParser.extractMemory(message);
 
     if (memory.isNotEmpty) {
-    await _memoryService.saveMemory(memory);
+      await _memoryService.saveMemory(memory);
     }
-    if (_isTyping) return;
-
-    if (message.isEmpty) return;
 
     setState(() {
       _messages.add(
@@ -54,13 +122,28 @@ class _ChatScreenState extends State<ChatScreen> {
       _conversation.add(Content.text(message));
       _isTyping = true;
     });
-    await _chatRepository.saveMessage(
-      ChatHistory(
-        message: message,
-        isUser: true,
-        timestamp: DateTime.now(),
-      ),
-    );
+    try {
+      await _chatRepository.saveMessage(
+        ChatHistory(
+          conversationId: _currentConversationId,
+          message: message,
+          isUser: true,
+          timestamp: DateTime.now(),
+        ),
+      );
+      await _conversationRepository.updateTitleIfNeeded(
+        _currentConversationId,
+        message,
+      );
+
+      await _conversationRepository.updateConversation(
+        _currentConversationId,
+      );
+
+      await _loadConversations();
+    } catch (e) {
+      debugPrint('Failed to save user message: $e');
+    }
     _scrollToBottom();
 
     _controller.clear();
@@ -116,13 +199,22 @@ class _ChatScreenState extends State<ChatScreen> {
         _scrollToBottom();
       }
 
-      await _chatRepository.saveMessage(
-        ChatHistory(
-          message: reply,
-          isUser: false,
-          timestamp: DateTime.now(),
-        ),
-      );
+      try {
+        await _chatRepository.saveMessage(
+          ChatHistory(
+            conversationId: _currentConversationId,
+            message: reply,
+            isUser: false,
+            timestamp: DateTime.now(),
+          ),
+        );
+        await _conversationRepository.updateConversation(
+          _currentConversationId,
+        );
+        await _loadConversations();
+      } catch (e) {
+        debugPrint('Failed to save AI message: $e');
+      }
       _conversation.add(Content.model([TextPart(reply)]));
 
       setState(() {
@@ -136,7 +228,7 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _messages.add(
           ChatMessage(
-            message: 'Error: Unable to get AI response.',
+            message: '⚠️ AI service is temporarily unavailable.',
             isUser: false,
             time: DateTime.now(),
           ),
@@ -159,13 +251,20 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void _clearChat() {
+  Future<void> _clearChat() async {
+    final newConversationId = await _conversationRepository.createNewConversation();
+
+    if (!mounted) return;
+
     setState(() {
+      _currentConversationId = newConversationId;
       _messages.clear();
       _conversation.clear();
+      _conversations = [];
       _isTyping = false;
       _controller.clear();
     });
+    await _loadConversations();
   }
 
   void _showClearChatDialog() {
@@ -180,9 +279,9 @@ class _ChatScreenState extends State<ChatScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              _clearChat();
+              await _clearChat();
             },
             child: const Text('New Chat'),
           ),
@@ -194,6 +293,86 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: Drawer(
+        child: SafeArea(
+          child: Column(
+            children: [
+              const DrawerHeader(
+                child: Center(
+                  child: Text(
+                    'Smart AI Assistant',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.add_comment_outlined),
+                title: const Text('New Chat'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _clearChat();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.search),
+                title: const Text('Search Chats'),
+                onTap: () {
+                  Navigator.pop(context);
+                },
+              ),
+              const Divider(),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Recent Chats',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: _conversations.isEmpty
+                    ? const Center(
+                        child: Text('No chat history yet.'),
+                      )
+                    : ListView.builder(
+                        itemCount: _conversations.length,
+                        itemBuilder: (context, index) {
+                          final conversation = _conversations[index];
+                          return ListTile(
+                            leading: const Icon(Icons.chat_bubble_outline),
+                            title: Text(conversation.title),
+                            subtitle: Text(
+                              '${conversation.updatedAt.day}/${conversation.updatedAt.month}/${conversation.updatedAt.year}',
+                            ),
+                            onTap: () async {
+                              _currentConversationId = conversation.id!;
+                              Navigator.pop(context);
+                              await _loadChatHistory();
+                            },
+                          );
+                        },
+                      ),
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.settings_outlined),
+                title: const Text('Settings'),
+                onTap: () {
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
       appBar: AppBar(
         title: const Text("Smart AI Chat"),
         centerTitle: true,

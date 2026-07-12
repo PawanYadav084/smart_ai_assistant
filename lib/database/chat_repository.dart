@@ -17,15 +17,27 @@ class ChatRepository {
     );
   }
 
-  Future<List<ChatHistory>> getMessages() async {
+  Future<List<ChatHistory>> getMessages(int conversationId) async {
     final Database db = await _databaseHelper.database;
 
     final List<Map<String, dynamic>> maps = await db.query(
       'chat_messages',
+      where: 'conversation_id = ?',
+      whereArgs: [conversationId],
       orderBy: 'id ASC',
     );
 
     return maps.map((e) => ChatHistory.fromMap(e)).toList();
+  }
+
+  Future<void> deleteConversationMessages(int conversationId) async {
+    final Database db = await _databaseHelper.database;
+
+    await db.delete(
+      'chat_messages',
+      where: 'conversation_id = ?',
+      whereArgs: [conversationId],
+    );
   }
 
   Future<void> deleteAllMessages() async {
