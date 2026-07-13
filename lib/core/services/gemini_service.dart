@@ -62,6 +62,7 @@
 
 
 import 'ai_service.dart';
+import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 
@@ -99,4 +100,27 @@ class GeminiService implements AIService {
       return '⚠️ Something went wrong.\nPlease check your internet connection.';
     }
   }
+
+  Future<String> generateImageResponse({
+    required File image,
+    required String prompt,
+  }) async {
+    try {
+      final bytes = await image.readAsBytes();
+
+      final response = await _model.generateContent([
+        Content.multi([
+          TextPart(prompt),
+          DataPart('image/jpeg', bytes),
+        ]),
+      ]).timeout(const Duration(seconds: 60));
+
+      return response.text ?? 'Sorry, I could not analyze the image.';
+    } on GenerativeAIException catch (e) {
+      return '⚠️ Gemini Vision Error:\n${e.message}';
+    } catch (_) {
+      return '⚠️ Failed to analyze the image.';
+    }
+  }
 }
+

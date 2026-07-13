@@ -30,6 +30,24 @@ class ChatRepository {
     return maps.map((e) => ChatHistory.fromMap(e)).toList();
   }
 
+  Future<ChatHistory?> getLastMessage(int conversationId) async {
+  final Database db = await _databaseHelper.database;
+
+  final result = await db.query(
+    'chat_messages',
+    where: 'conversation_id = ?',
+    whereArgs: [conversationId],
+    orderBy: 'id DESC',
+    limit: 1,
+  );
+
+  if (result.isEmpty) {
+    return null;
+  }
+
+  return ChatHistory.fromMap(result.first);
+}
+
   Future<void> deleteConversationMessages(int conversationId) async {
     final Database db = await _databaseHelper.database;
 

@@ -4,10 +4,12 @@ import '../../../../models/chat_message.dart';
 
 class ChatBubble extends StatelessWidget {
   final ChatMessage chat;
+  final VoidCallback? onSpeak;
 
   const ChatBubble({
     super.key,
     required this.chat,
+    this.onSpeak,
   });
 
   @override
@@ -62,6 +64,19 @@ class ChatBubble extends StatelessWidget {
                   text: chat.message,
                   textColor: chat.isUser ? Colors.white : Colors.black,
                 ),
+                if (!chat.isUser && onSpeak != null) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      icon: const Icon(Icons.volume_up, size: 20),
+                      tooltip: 'Read aloud',
+                      onPressed: onSpeak,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 6),
                 Text(
                   "${chat.time.hour}:${chat.time.minute.toString().padLeft(2, '0')}",

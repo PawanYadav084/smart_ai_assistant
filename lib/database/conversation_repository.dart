@@ -106,6 +106,18 @@ class ConversationRepository {
     return Conversation.fromMap(result.first);
   }
 
+  Future<bool> isConversationEmpty(int id) async {
+    final Database db = await _databaseHelper.database;
+
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) AS count FROM chat_messages WHERE conversation_id = ?',
+      [id],
+    );
+
+    final count = (result.first['count'] as int?) ?? 0;
+    return count == 0;
+  }
+
   Future<void> deleteConversation(int id) async {
     final Database db = await _databaseHelper.database;
 
@@ -114,5 +126,11 @@ class ConversationRepository {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  Future<void> deleteIfEmpty(int id) async {
+    if (await isConversationEmpty(id)) {
+      await deleteConversation(id);
+    }
   }
 }
