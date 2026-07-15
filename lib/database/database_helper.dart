@@ -20,7 +20,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -34,14 +34,11 @@ class DatabaseHelper {
           )
         ''');
 
-        await db.insert(
-          'conversations',
-          {
-            'title': 'New Chat',
-            'created_at': DateTime.now().toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
-          },
-        );
+        await db.insert('conversations', {
+          'title': 'New Chat',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        });
 
         await db.execute('''
           CREATE TABLE chat_messages (
@@ -50,6 +47,7 @@ class DatabaseHelper {
             message TEXT NOT NULL,
             isUser INTEGER NOT NULL,
             timestamp TEXT NOT NULL,
+            image_path TEXT,
             FOREIGN KEY(conversation_id)
             REFERENCES conversations(id)
             ON DELETE CASCADE
@@ -67,14 +65,11 @@ class DatabaseHelper {
             )
           ''');
 
-          await db.insert(
-            'conversations',
-            {
-              'title': 'New Chat',
-              'created_at': DateTime.now().toIso8601String(),
-              'updated_at': DateTime.now().toIso8601String(),
-            },
-          );
+          await db.insert('conversations', {
+            'title': 'New Chat',
+            'created_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          });
 
           try {
             await db.execute(
@@ -87,21 +82,28 @@ class DatabaseHelper {
             'UPDATE chat_messages SET conversation_id = 1 WHERE conversation_id IS NULL',
           );
         }
+
+        if (oldVersion < 3) {
+          try {
+            await db.execute(
+              'ALTER TABLE chat_messages ADD COLUMN image_path TEXT',
+            );
+          } catch (_) {
+            // Column already exists.
+          }
+        }
         final existing = await db.query(
           'conversations',
           where: 'id = ?',
           whereArgs: [1],
         );
         if (existing.isEmpty) {
-          await db.insert(
-            'conversations',
-            {
-              'id': 1,
-              'title': 'New Chat',
-              'created_at': DateTime.now().toIso8601String(),
-              'updated_at': DateTime.now().toIso8601String(),
-            },
-          );
+          await db.insert('conversations', {
+            'id': 1,
+            'title': 'New Chat',
+            'created_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          });
         }
       },
     );

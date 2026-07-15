@@ -3,7 +3,6 @@ import 'widgets/chat_bubble.dart';
 import '../../../models/chat_message.dart';
 import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
-import '../../../core/memory/memory_parser.dart';
 import '../../../core/memory/memory_service.dart';
 import '../../../database/chat_repository.dart';
 import '../../../database/chat_history.dart';
@@ -18,6 +17,15 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/services/gemini_service.dart';
+import 'widgets/message_input.dart';
+import 'widgets/image_preview.dart';
+import 'widgets/pdf_preview.dart';
+import '../../../core/services/chat_service.dart';
+import '../../../models/pdf_document.dart';
+import 'package:file_picker/file_picker.dart';
+import '../../../core/services/pdf_service.dart';
+
+
 
 
 
@@ -30,6 +38,10 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
+  PdfDocumentModel? _selectedPdf;
+
+  final FilePicker _filePicker = FilePicker.platform;
+  final PdfService _pdfService = PdfService();
   final TextEditingController _controller = TextEditingController();
 
   final ScrollController _scrollController = ScrollController();
@@ -37,6 +49,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<ChatMessage> _messages = [];
   late stt.SpeechToText _speech;
   late FlutterTts _flutterTts;
+  late ChatService _chatService;
 
   bool _isListening = false;
 
@@ -44,12 +57,14 @@ class _ChatScreenState extends State<ChatScreen> {
   File? _selectedImage;
 
   late AIService _aiService;
+  final GeminiService _geminiVisionService = GeminiService();
   final MemoryService _memoryService = MemoryService();
   final ChatRepository _chatRepository = ChatRepository();
   final List<Content> _conversation = [];
   List<Conversation> _conversations = [];
   int _currentConversationId = 1;
-  final ConversationRepository _conversationRepository = ConversationRepository();
+  final ConversationRepository _conversationRepository =
+      ConversationRepository();
   final TextEditingController _searchController = TextEditingController();
 
   List<Conversation> _filteredConversations = [];
@@ -57,15 +72,17 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // bool _isSearching = false;
 
-  bool _isTyping = false;
+bool _isTyping = false;
+bool _webSearchEnabled = false;
+String _typingMessage = '🤖 Thinking...';
 
   @override
   void initState() {
+    super.initState();
+
     _speech = stt.SpeechToText();
     _flutterTts = FlutterTts();
     _initTts();
-
-    super.initState();
 
     switch (AppConfig.provider) {
       case AIProvider.gemini:
@@ -76,10 +93,17 @@ class _ChatScreenState extends State<ChatScreen> {
         break;
     }
 
+    _chatService = ChatService(
+      aiService: _aiService,
+      geminiVisionService: _geminiVisionService,
+      memoryService: _memoryService,
+      chatRepository: _chatRepository,
+      conversationRepository: _conversationRepository,
+    );
+
     _loadChatHistory();
     _loadConversations();
   }
-
   Future<void> _initTts() async {
     await _flutterTts.setLanguage('en-US');
     await _flutterTts.setSpeechRate(0.45);
@@ -87,14 +111,16 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _loadChatHistory() async {
-    final chatHistory = await _chatRepository.getMessages(_currentConversationId);
+    final chatHistory = await _chatRepository.getMessages(
+      _currentConversationId,
+    );
 
     if (!mounted) return;
 
     setState(() {
       chatHistory.sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
-      // if (_messages.isEmpty) 
+      // if (_messages.isEmpty)
       {
         _messages.clear();
         _conversation.clear();
@@ -105,13 +131,14 @@ class _ChatScreenState extends State<ChatScreen> {
               message: history.message,
               isUser: history.isUser,
               time: history.timestamp,
+              imagePath: history.imagePath,
             ),
           );
 
           _conversation.add(
             history.isUser
-              ? Content.text(history.message)
-              : Content.model([TextPart(history.message)]),
+                ? Content.text(history.message)
+                : Content.model([TextPart(history.message)]),
           );
         }
       }
@@ -120,169 +147,160 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
   }
 
-  Future<void> _loadConversations() async {
-    final conversations = await _conversationRepository.getAllConversations();
-    if (!mounted) return;
-    setState(() {
-      conversations.sort(
-        (a, b) => b.updatedAt.compareTo(a.updatedAt),
-      );
-      _conversations = conversations;
-      _filteredConversations = List.from(conversations);
-    });
-    for (final conversation in conversations) {
-      final lastMessage = await _chatRepository.getLastMessage(conversation.id!);
-      _conversationPreviews[conversation.id!] =
-          lastMessage?.message ?? 'No messages yet';
-    }
+Future<void> _loadConversations() async {
+  final conversations = await _conversationRepository.getAllConversations();
+
+  if (!mounted) return;
+
+  conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+  _conversationPreviews.clear();
+
+  for (final conversation in conversations) {
+    final lastMessage =
+        await _chatRepository.getLastMessage(conversation.id!);
+
+    _conversationPreviews[conversation.id!] =
+        lastMessage?.message ?? 'No messages yet';
   }
 
-  Future<void> _sendMessage() async {
-    final message = _controller.text.trim();
-    if (_isTyping) return;
-    if (message.isEmpty && _selectedImage == null) return;
-    final memory = MemoryParser.extractMemory(message);
+  if (!mounted) return;
 
-    if (memory.isNotEmpty) {
-      await _memoryService.saveMemory(memory);
+  setState(() {
+    _conversations = conversations;
+    _filteredConversations = List.from(conversations);
+  });
+}
+
+
+  Future<void> _sendMessage() async {
+    if (_isTyping) return;
+    final typedMessage = _controller.text.trim();
+    final selectedImage = _selectedImage;
+    final selectedPdf = _selectedPdf;
+
+    if (typedMessage.isEmpty &&
+        selectedImage == null &&
+        selectedPdf == null) {
+      return;
     }
+
+    final timestamp = DateTime.now();
+    final userMessage = typedMessage.isEmpty
+        ? (selectedPdf != null
+            ? 'Summarize this PDF.'
+            : selectedImage != null
+                ? 'Analyze this image.'
+                : '')
+        : typedMessage;
 
     setState(() {
       _messages.add(
         ChatMessage(
-          message: message,
+          message: userMessage,
           isUser: true,
-          time: DateTime.now(),
+          time: timestamp,
+          imagePath: selectedImage?.path,
         ),
-      );
-      _conversation.add(Content.text(message));
-      _isTyping = true;
-    });
-    try {
-      await _chatRepository.saveMessage(
-        ChatHistory(
-          conversationId: _currentConversationId,
-          message: message,
-          isUser: true,
-          timestamp: DateTime.now(),
-        ),
-      );
-      await _conversationRepository.updateTitleIfNeeded(
-        _currentConversationId,
-        message,
       );
 
-      await _conversationRepository.updateConversation(
-        _currentConversationId,
+      _conversation.add(Content.text(userMessage));
+      if (selectedPdf != null) {
+        _typingMessage = '📄 Analyzing PDF...';
+      } else if (_webSearchEnabled && typedMessage.isNotEmpty) {
+        _typingMessage = '🌐 Searching the web...';
+      } else if (selectedImage != null) {
+        _typingMessage = '🖼️ Analyzing image...';
+      } else {
+        _typingMessage = '🤖 Thinking...';
+      }
+      _isTyping = true;
+      _selectedImage = null;
+      // _selectedPdf = null;  // removed as per instructions
+    });
+
+    _controller.clear();
+    _scrollToBottom();
+
+    try {
+      await _chatService.saveUserMessage(
+        conversationId: _currentConversationId,
+        message: userMessage,
+        image: selectedImage,
       );
 
       await _loadConversations();
-    } catch (e) {
-      debugPrint('Failed to save user message: $e');
-    }
-    _scrollToBottom();
 
-    _controller.clear();
-
-    try {
-      final savedMemory = await _memoryService.loadMemory();
-
-      final memoryPrompt = '''
-      User Information:
-      Name: ${savedMemory['name']}
-      City: ${savedMemory['city']}
-      Profession: ${savedMemory['profession']}
-      Favorite Language: ${savedMemory['language']}
-
-      Use this information only if it is relevant to the user's request.
-      ''';
-      final requestConversation = [
-        Content.text(memoryPrompt),
-        ..._conversation,
-      ];
-      // final reply = await _aiService.generateResponse(requestConversation);
-      String reply;
-
-      if (_selectedImage != null && _aiService is GeminiService) {
-      reply = await (_aiService as GeminiService).generateImageResponse(
-      image: _selectedImage!,
-      prompt: message.isEmpty
-        ? 'Describe this image in detail.'
-        : message,
-  );
-} else {
-  reply = await _aiService.generateResponse(requestConversation);
-}
-
-      if (!mounted) return;
-
-      // Streaming effect for AI response
-      _messages.add(
-        ChatMessage(
-          message: '',
-          isUser: false,
-          time: DateTime.now(),
-        ),
-      );
-
-      final words = reply.split(' ');
-
-      for (int i = 0; i < words.length; i++) {
-        if (!mounted) return;
-
-        await Future.delayed(const Duration(milliseconds: 35));
-
-        setState(() {
-          final current = _messages.last;
-
-          _messages[_messages.length - 1] = ChatMessage(
-            message: current.message.isEmpty
-                ? words[i]
-                : '${current.message} ${words[i]}',
-            isUser: false,
-            time: current.time,
+      final String reply;
+      if (selectedPdf != null) {
+        if (typedMessage.isEmpty) {
+          reply = await _geminiVisionService.summarizePdf(
+            selectedPdf.extractedText,
           );
-        });
-
-        _scrollToBottom();
+        } else {
+          reply = await _geminiVisionService.askPdf(
+            pdfText: selectedPdf.extractedText,
+            question: typedMessage,
+          );
+        }
+      } else if (_webSearchEnabled && typedMessage.isNotEmpty) {
+        reply = await _chatService.generateWebReply(
+          query: typedMessage,
+        );
+      } else {
+        reply = await _chatService.generateReply(
+          conversation: _conversation,
+          image: selectedImage,
+          userMessage: userMessage,
+        );
       }
 
-      try {
-        await _chatRepository.saveMessage(
-          ChatHistory(
-            conversationId: _currentConversationId,
-            message: reply,
-            isUser: false,
-            timestamp: DateTime.now(),
-          ),
-        );
-        await _conversationRepository.updateConversation(
-          _currentConversationId,
-        );
-        await _loadConversations();
-      } catch (e) {
-        debugPrint('Failed to save AI message: $e');
-      }
-      _conversation.add(Content.model([TextPart(reply)]));
+      final responseTime = DateTime.now();
 
-      setState(() {
-        _isTyping = false;
-      });
-    } catch (e, stackTrace) {
-      debugPrint("ERROR: $e");
-      debugPrintStack(stackTrace: stackTrace);
       if (!mounted) return;
 
       setState(() {
         _messages.add(
           ChatMessage(
-            message: '⚠️ AI service is temporarily unavailable.',
+            message: reply,
+            isUser: false,
+            time: responseTime,
+          ),
+        );
+
+        _conversation.add(Content.model([TextPart(reply)]));
+        _isTyping = false;
+      });
+
+      await _chatService.saveAssistantMessage(
+        conversationId: _currentConversationId,
+        message: reply,
+      );
+
+      if (selectedImage != null) {
+        setState(() {
+          _selectedImage = null;
+        });
+      }
+
+      await _loadConversations();
+      if (!mounted) return;
+      _scrollToBottom();
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _messages.add(
+          ChatMessage(
+            message: '⚠️ $e',
             isUser: false,
             time: DateTime.now(),
           ),
         );
-
         _isTyping = false;
+        // Restore attachments so user can retry
+        _selectedImage = selectedImage;
+        _selectedPdf = selectedPdf;
       });
     }
   }
@@ -299,49 +317,39 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  // Future<void> _clearChat() async {
-  //   final newConversationId = await _conversationRepository.createNewConversation();
-
-  //   if (!mounted) return;
-
-  //   setState(() {
-  //     _currentConversationId = newConversationId;
-  //     _messages.clear();
-  //     _conversation.clear();
-  //     _conversations = [];
-  //     _isTyping = false;
-  //     _controller.clear();
-  //   });
-  //   await _loadConversations();
-  // }
-
   Future<void> _clearChat() async {
-  // Delete current conversation only if it has no messages.
-  await _conversationRepository.deleteIfEmpty(_currentConversationId);
+    // Delete current conversation only if it has no messages.
+    await _conversationRepository.deleteIfEmpty(_currentConversationId);
 
-  final newConversationId =
-      await _conversationRepository.createNewConversation();
+    final newConversationId = await _conversationRepository
+        .createNewConversation();
 
-  if (!mounted) return;
+    if (!mounted) return;
 
-  setState(() {
-    _currentConversationId = newConversationId;
-    _messages.clear();
-    _conversation.clear();
-    _conversations.clear();
-    _filteredConversations.clear();
-    _isTyping = false;
-    // _controller.clear();
-    _selectedImage = null;
-  });
+    setState(() {
+      _currentConversationId = newConversationId;
+      _messages.clear();
+      _conversation.clear();
+      _conversations.clear();
+      _filteredConversations.clear();
+      _isTyping = false;
+      _controller.clear();
+      _selectedImage = null;
+      _selectedPdf = null;
+    });
 
-  await _loadConversations();
-}
+    await _loadConversations();
+  }
 
   Future<void> _deleteConversation(Conversation conversation) async {
     await _conversationRepository.deleteConversation(conversation.id!);
 
     if (!mounted) return;
+
+    setState(() {
+      _selectedPdf = null;
+      _selectedImage = null;
+    });
 
     await _loadConversations();
 
@@ -365,9 +373,7 @@ class _ChatScreenState extends State<ChatScreen> {
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Conversation title',
-          ),
+          decoration: const InputDecoration(hintText: 'Conversation title'),
         ),
         actions: [
           TextButton(
@@ -437,9 +443,9 @@ class _ChatScreenState extends State<ChatScreen> {
     await _flutterTts.speak(text);
   }
 
-  Future<void> _pickImage() async {
+  Future<void> _pickImage(ImageSource source) async {
     final XFile? image = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
+      source: source,
       imageQuality: 85,
     );
 
@@ -447,17 +453,98 @@ class _ChatScreenState extends State<ChatScreen> {
 
     setState(() {
       _selectedImage = File(image.path);
+      _selectedPdf = null; // Clear PDF selection when an image is picked
     });
   }
+
+  Future<void> _pickPdf() async {
+    final result = await _filePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+      withData: false,
+    );
+
+    if (result == null || result.files.isEmpty) return;
+
+    final picked = result.files.single;
+    if (picked.path == null) return;
+
+    final file = File(picked.path!);
+    final text = await _pdfService.extractText(file);
+
+    // Stability improvement: Show message if no readable text found
+    if (text.trim().isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No readable text found in this PDF.'),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _selectedPdf = PdfDocumentModel(
+        file: file,
+        fileName: picked.name,
+        extractedText: text,
+      );
+      _selectedImage = null; // Clear image selection when a PDF is picked
+    });
+  }
+
+  void _showImagePickerSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(20),
+        ),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            const Text(
+              'Choose Image',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Camera'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Gallery'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage(ImageSource.gallery);
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _filterConversations(String query) {
     setState(() {
       if (query.trim().isEmpty) {
         _filteredConversations = List.from(_conversations);
       } else {
         _filteredConversations = _conversations.where((conversation) {
-          return conversation.title
-              .toLowerCase()
-              .contains(query.toLowerCase());
+          return conversation.title.toLowerCase().contains(query.toLowerCase());
         }).toList();
       }
     });
@@ -479,9 +566,13 @@ class _ChatScreenState extends State<ChatScreen> {
     for (final conversation in _filteredConversations) {
       final date = conversation.updatedAt;
 
-      if (date.year == now.year && date.month == now.month && date.day == now.day) {
+      if (date.year == now.year &&
+          date.month == now.month &&
+          date.day == now.day) {
         groups['Today']!.add(conversation);
-      } else if (date.year == yesterday.year && date.month == yesterday.month && date.day == yesterday.day) {
+      } else if (date.year == yesterday.year &&
+          date.month == yesterday.month &&
+          date.day == yesterday.day) {
         groups['Yesterday']!.add(conversation);
       } else if (date.isAfter(lastWeek)) {
         groups['Last 7 Days']!.add(conversation);
@@ -528,10 +619,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: Center(
                   child: Text(
                     'Smart AI Assistant',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -543,48 +631,29 @@ class _ChatScreenState extends State<ChatScreen> {
                   await _clearChat();
                 },
               ),
-              // TextField(
-              //   controller: _searchController,
-              //   decoration: const InputDecoration(
-              //     labelText: 'Search Chats',
-              //     prefixIcon: Icon(Icons.search),
-              //   ),
-              //   onChanged: (value) {
-              //     _filterConversations(value);
-
-              //     suffixIcon: _searchController.text.isEmpty
-              //       ? null
-              //       : IconButton(
-              //         icon: const Icon(Icons.clear),
-              //         onPressed: () {
-              //           _searchController.clear();
-              //           _filterConversations('');
-              //         },
-              //       ),
-              //    },
-              //  ),
-              TextField(
-  controller: _searchController,
-  decoration: InputDecoration(
-    labelText: 'Search Chats',
-    prefixIcon: const Icon(Icons.search),
-    suffixIcon: _searchController.text.isEmpty
-        ? null
-        : IconButton(
-            icon: const Icon(Icons.clear),
-            onPressed: () {
-              _searchController.clear();
-              _filterConversations('');
-              setState(() {});
-            },
-          ),
-  ),
-  onChanged: (value) {
-    setState(() {});
-    _filterConversations(value);
-  },
-),
               
+              TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  labelText: 'Search Chats',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchController.text.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            _filterConversations('');
+                            setState(() {});
+                          },
+                        ),
+                ),
+                onChanged: (value) {
+                  setState(() {});
+                  _filterConversations(value);
+                },
+              ),
+
               const Divider(),
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -601,16 +670,17 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               Expanded(
                 child: _filteredConversations.isEmpty
-                    ? const Center(
-                        child: Text('No chat history yet.'),
-                      )
+                    ? const Center(child: Text('No chat history yet.'))
                     : (() {
                         final grouped = _groupConversations();
                         final List<Widget> children = [];
                         grouped.entries.forEach((entry) {
                           children.add(
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
                               child: Align(
                                 alignment: Alignment.centerLeft,
                                 child: Text(
@@ -627,16 +697,19 @@ class _ChatScreenState extends State<ChatScreen> {
                             children.add(
                               ListTile(
                                 leading: const Icon(Icons.chat_bubble_outline),
-                                selected: _currentConversationId == conversation.id,
-                                selectedTileColor:
-                                    Theme.of(context).colorScheme.primary.withOpacity(0.08),
+                                selected:
+                                    _currentConversationId == conversation.id,
+                                selectedTileColor: Theme.of(
+                                  context,
+                                ).colorScheme.primary.withOpacity(0.08),
                                 title: Text(
                                   conversation.title,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 subtitle: Text(
-                                  _conversationPreviews[conversation.id!] ?? 'No messages yet',
+                                  _conversationPreviews[conversation.id!] ??
+                                      'No messages yet',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -660,7 +733,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                   ],
                                 ),
                                 onTap: () async {
-                                  if (_currentConversationId == conversation.id) {
+                                  if (_currentConversationId ==
+                                      conversation.id) {
                                     Navigator.pop(context);
                                     return;
                                   }
@@ -669,6 +743,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                     _messages.clear();
                                     _conversation.clear();
                                     _isTyping = false;
+                                    _selectedPdf = null;
+                                    _selectedImage = null;
                                   });
                                   Navigator.pop(context);
                                   await _loadChatHistory();
@@ -678,14 +754,18 @@ class _ChatScreenState extends State<ChatScreen> {
                                     context: context,
                                     builder: (_) => AlertDialog(
                                       title: const Text('Delete Conversation'),
-                                      content: const Text('Delete this conversation permanently?'),
+                                      content: const Text(
+                                        'Delete this conversation permanently?',
+                                      ),
                                       actions: [
                                         TextButton(
-                                          onPressed: () => Navigator.pop(context, false),
+                                          onPressed: () =>
+                                              Navigator.pop(context, false),
                                           child: const Text('Cancel'),
                                         ),
                                         FilledButton(
-                                          onPressed: () => Navigator.pop(context, true),
+                                          onPressed: () =>
+                                              Navigator.pop(context, true),
                                           child: const Text('Delete'),
                                         ),
                                       ],
@@ -699,9 +779,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             );
                           }
                         });
-                        return ListView(
-                          children: children,
-                        );
+                        return ListView(children: children);
                       })(),
               ),
               const Divider(),
@@ -721,6 +799,18 @@ class _ChatScreenState extends State<ChatScreen> {
         centerTitle: true,
         actions: [
           IconButton(
+            tooltip: _webSearchEnabled ? 'Web Search ON' : 'Web Search OFF',
+            icon: Icon(
+              Icons.travel_explore,
+              color: _webSearchEnabled ? Colors.blue : null,
+            ),
+            onPressed: () {
+              setState(() {
+                _webSearchEnabled = !_webSearchEnabled;
+              });
+            },
+          ),
+          IconButton(
             onPressed: _showClearChatDialog,
             icon: const Icon(Icons.delete_outline),
             tooltip: "New Chat",
@@ -730,7 +820,6 @@ class _ChatScreenState extends State<ChatScreen> {
       body: SafeArea(
         child: Column(
           children: [
-
             // Chat Area
             Expanded(
               child: Column(
@@ -786,84 +875,49 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                   ),
                   if (_isTyping)
-                    const Padding(
-                      padding: EdgeInsets.only(
-                        left: 16,
-                        bottom: 12,
-                      ),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 16, bottom: 12),
                       child: Align(
                         alignment: Alignment.centerLeft,
-                        child: TypingIndicator(),
+                        child: TypingIndicator(
+                          message: _typingMessage,
+                        ),
                       ),
                     ),
                 ],
               ),
             ),
 
-            // Image preview (Gemini Vision UI - Stage 1)
-            if (_selectedImage != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.file(
-                    _selectedImage!,
-                    height: 120,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
+            ImagePreview(
+              image: _selectedImage,
+              isUploading: _isTyping,
+              onRemove: () {
+                setState(() {
+                  _selectedImage = null;
+                });
+              },
+            ),
 
-            // Message Box
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.image_outlined),
-                    tooltip: 'Pick Image',
-                    onPressed: _pickImage,
-                  ),
-                  CircleAvatar(
-                    radius: 24,
-                    child: IconButton(
-                      icon: Icon(_isListening ? Icons.mic : Icons.mic_none),
-                      onPressed: _toggleListening,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      enabled: !_isTyping,
-                      onSubmitted: (_) => _sendMessage(),
-                      textInputAction: TextInputAction.send,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: InputDecoration(
-                        hintText: "Type your message...",
-                        filled: true,
-                        fillColor: Colors.grey.shade100,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  CircleAvatar(
-                    radius: 26,
-                    backgroundColor: const Color(0xFF2575FC),
-                    child: IconButton(
-                      onPressed: _isTyping ? null : _sendMessage,
-                      icon: const Icon(
-                        Icons.send,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
+            PdfPreview(
+              fileName: _selectedPdf?.fileName,
+              isUploading: _isTyping,
+              onRemove: () {
+                setState(() {
+                  _selectedPdf = null;
+                });
+              },
+            ),
+
+            SafeArea(
+              top: false,
+              child: MessageInput(
+                controller: _controller,
+                isTyping: _isTyping,
+                isListening: _isListening,
+                onSend: _sendMessage,
+                onMicPressed: _toggleListening,
+                onImagePressed: _showImagePickerSheet,
+                onPdfPressed: _pickPdf,
               ),
             ),
           ],
@@ -872,21 +926,13 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-//   @override
-//   void dispose() {
-//     _controller.dispose();
-//     _scrollController.dispose();
-//     super.dispose();
-//   }
-// }
-
-@override
-void dispose() {
-  _speech.stop();
-  _flutterTts.stop();
-  _searchController.dispose();
-  _controller.dispose();
-  _scrollController.dispose();
-  super.dispose();
-}
+  @override
+  void dispose() {
+    _speech.stop();
+    _flutterTts.stop();
+    _searchController.dispose();
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
 }

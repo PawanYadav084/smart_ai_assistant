@@ -4,6 +4,7 @@ class ChatHistory {
   final String message;
   final bool isUser;
   final DateTime timestamp;
+  final String? imagePath;
 
   const ChatHistory({
     this.id,
@@ -11,6 +12,7 @@ class ChatHistory {
     required this.message,
     required this.isUser,
     required this.timestamp,
+    this.imagePath,
   });
 
   Map<String, dynamic> toMap() {
@@ -20,6 +22,7 @@ class ChatHistory {
       'message': message,
       'isUser': isUser ? 1 : 0,
       'timestamp': timestamp.toIso8601String(),
+      'image_path': imagePath,
     };
   }
 
@@ -30,6 +33,7 @@ class ChatHistory {
       message: map['message'] as String,
       isUser: map['isUser'] == 1,
       timestamp: DateTime.parse(map['timestamp'] as String),
+      imagePath: map['image_path'] as String?,
     );
   }
 }

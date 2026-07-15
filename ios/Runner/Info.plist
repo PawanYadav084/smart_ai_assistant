@@ -6,6 +6,8 @@
 	<string>This app uses speech recognition to convert your voice into text.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app uses the microphone to record your voice.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app lets you select images to analyze with AI.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

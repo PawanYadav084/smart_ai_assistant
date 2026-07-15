@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 
 class TypingIndicator extends StatefulWidget {
-  const TypingIndicator({super.key});
+  const TypingIndicator({
+    super.key,
+    this.message = 'Thinking...',
+  });
+
+  final String message;
 
   @override
   State<TypingIndicator> createState() => _TypingIndicatorState();
@@ -77,12 +82,26 @@ class _TypingIndicatorState extends State<TypingIndicator>
             color: Colors.grey.shade300,
             borderRadius: BorderRadius.circular(18),
           ),
-          child: Row(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              buildDot(0),
-              buildDot(1),
-              buildDot(2),
+              Text(
+                widget.message,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  buildDot(0),
+                  buildDot(1),
+                  buildDot(2),
+                ],
+              ),
             ],
           ),
         ),

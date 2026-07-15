@@ -9,6 +9,7 @@ import 'ai_service.dart';
 
 class GroqService implements AIService {
   final String _apiKey = dotenv.env['GROQ_API_KEY']!.trim();
+  static const String _model = 'llama-3.3-70b-versatile';
 
   @override
   Future<String> generateResponse(List<Content> conversation) async {
@@ -32,6 +33,13 @@ class GroqService implements AIService {
         return '⚠️ GROQ_API_KEY is missing.';
       }
 
+      final requestBody = {
+        'model': _model,
+        'messages': messages,
+        'temperature': 0.7,
+        'max_tokens': 2048,
+      };
+
       final response = await http.post(
         Uri.parse(
           'https://api.groq.com/openai/v1/chat/completions',
@@ -40,12 +48,7 @@ class GroqService implements AIService {
           'Authorization': 'Bearer $_apiKey',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'model': 'llama-3.3-70b-versatile',
-          'messages': messages,
-          'temperature': 0.7,
-          'max_tokens': 2048,
-        }),
+        body: jsonEncode(requestBody),
       ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
@@ -70,5 +73,14 @@ class GroqService implements AIService {
 
       return "Groq Error:\n$e";
 }
+  }
+
+  @override
+  Future<String> generateWebResponse({
+    required String query,
+  }) async {
+    return generateResponse([
+      Content.text(query),
+    ]);
   }
 }

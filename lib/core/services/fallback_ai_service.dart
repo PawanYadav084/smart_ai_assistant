@@ -1,5 +1,3 @@
-
-
 import 'package:google_generative_ai/google_generative_ai.dart';
 
 import 'ai_service.dart';
@@ -12,22 +10,35 @@ class FallbackAIService implements AIService {
 
   @override
   Future<String> generateResponse(List<Content> conversation) async {
-    final geminiReply = await _gemini.generateResponse(conversation);
+    try {
+      final geminiReply = await _gemini.generateResponse(conversation);
 
-    final lower = geminiReply.toLowerCase();
+      final lower = geminiReply.toLowerCase();
 
-    final shouldFallback =
-        lower.contains('quota') ||
-        lower.contains('rate limit') ||
-        lower.contains('429') ||
-        lower.contains('server is busy') ||
-        lower.contains('503') ||
-        lower.contains('resource exhausted');
+      final shouldFallback =
+          lower.contains('quota') ||
+          lower.contains('rate limit') ||
+          lower.contains('429') ||
+          lower.contains('server is busy') ||
+          lower.contains('503') ||
+          lower.contains('resource exhausted');
 
-    if (!shouldFallback) {
-      return geminiReply;
+      if (!shouldFallback) {
+        return geminiReply;
+      }
+    } catch (_) {
+      // Gemini failed. Fall back to Groq.
     }
 
-    return await _groq.generateResponse(conversation);
+    return _groq.generateResponse(conversation);
+  }
+
+  @override
+  Future<String> generateWebResponse({
+    required String query,
+  }) async {
+    return generateResponse([
+      Content.text(query),
+    ]);
   }
 }
