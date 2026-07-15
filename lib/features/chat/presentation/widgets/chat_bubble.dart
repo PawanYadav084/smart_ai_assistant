@@ -8,8 +8,14 @@ import '../../../../models/chat_message.dart';
 class ChatBubble extends StatefulWidget {
   final ChatMessage chat;
   final VoidCallback? onSpeak;
+  final VoidCallback? onRegenerate;
 
-  const ChatBubble({super.key, required this.chat, this.onSpeak});
+  const ChatBubble({
+    super.key,
+    required this.chat,
+    this.onSpeak,
+    this.onRegenerate,
+  });
 
   @override
   State<ChatBubble> createState() => _ChatBubbleState();
@@ -110,6 +116,11 @@ class _ChatBubbleState extends State<ChatBubble> {
                               ),
                             );
                           },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.refresh, size: 20),
+                          tooltip: 'Regenerate',
+                          onPressed: widget.onRegenerate,
                         ),
                         IconButton(
                           icon: Icon(

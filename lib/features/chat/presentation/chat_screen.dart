@@ -24,6 +24,7 @@ import '../../../core/services/chat_service.dart';
 import '../../../models/pdf_document.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../core/services/pdf_service.dart';
+import '../../settings/presentation/settings_screen.dart';
 
 
 
@@ -321,6 +322,36 @@ Future<void> _loadConversations() async {
       _cancelGeneration = true;
       _isTyping = false;
     });
+  }
+
+  Future<void> _regenerateLastResponse() async {
+    if (_isTyping || _messages.length < 2) return;
+
+    // Remove last AI message if present.
+    if (_messages.isNotEmpty && !_messages.last.isUser) {
+      _messages.removeLast();
+      if (_conversation.isNotEmpty) {
+        _conversation.removeLast();
+      }
+    }
+
+    // Find the last user message.
+    final lastUser = _messages.lastWhere(
+      (m) => m.isUser,
+      orElse: () => ChatMessage(
+        message: '',
+        isUser: true,
+        time: DateTime.now(),
+      ),
+    );
+
+    if (lastUser.message.isEmpty) return;
+
+    setState(() {
+      _controller.text = lastUser.message;
+    });
+
+    await _sendMessage();
   }
 
   void _scrollToBottom() {
@@ -806,6 +837,12 @@ Future<void> _loadConversations() async {
                 title: const Text('Settings'),
                 onTap: () {
                   Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SettingsScreen(),
+                    ),
+                  );
                 },
               ),
             ],
@@ -899,6 +936,7 @@ Future<void> _loadConversations() async {
                                 onSpeak: chat.isUser
                                     ? null
                                     : () => _speak(chat.message),
+                                onRegenerate: chat.isUser ? null : _regenerateLastResponse,
                               );
                             },
                           ),
