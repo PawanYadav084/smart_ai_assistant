@@ -75,6 +75,7 @@ class _ChatScreenState extends State<ChatScreen> {
 bool _isTyping = false;
 bool _webSearchEnabled = false;
 String _typingMessage = '🤖 Thinking...';
+bool _cancelGeneration = false;
 
   @override
   void initState() {
@@ -175,6 +176,7 @@ Future<void> _loadConversations() async {
 
   Future<void> _sendMessage() async {
     if (_isTyping) return;
+    _cancelGeneration = false;
     final typedMessage = _controller.text.trim();
     final selectedImage = _selectedImage;
     final selectedPdf = _selectedPdf;
@@ -255,6 +257,15 @@ Future<void> _loadConversations() async {
         );
       }
 
+      // Check for cancellation after reply is obtained, before adding message
+      if (_cancelGeneration) {
+        if (!mounted) return;
+        setState(() {
+          _isTyping = false;
+        });
+        return;
+      }
+
       final responseTime = DateTime.now();
 
       if (!mounted) return;
@@ -303,6 +314,13 @@ Future<void> _loadConversations() async {
         _selectedPdf = selectedPdf;
       });
     }
+  }
+  void _stopGenerating() {
+    if (!_isTyping) return;
+    setState(() {
+      _cancelGeneration = true;
+      _isTyping = false;
+    });
   }
 
   void _scrollToBottom() {
@@ -810,6 +828,17 @@ Future<void> _loadConversations() async {
               });
             },
           ),
+          if (_isTyping)
+            IconButton(
+              tooltip: 'Stop',
+              // icon: const Icon(Icons.stop_circle_outlined),
+              icon: const Icon(
+                Icons.stop,
+                color: Colors.red,
+                size: 28,
+              ),
+              onPressed: _stopGenerating,
+            ),
           IconButton(
             onPressed: _showClearChatDialog,
             icon: const Icon(Icons.delete_outline),
