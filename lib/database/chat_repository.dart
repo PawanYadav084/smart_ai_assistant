@@ -4,9 +4,11 @@ import 'package:sqflite/sqflite.dart';
 
 import 'database_helper.dart';
 import 'chat_history.dart';
+import '../features/chat/services/chat_service.dart';
 
 class ChatRepository {
   final DatabaseHelper _databaseHelper = DatabaseHelper.instance;
+  final ChatService _chatService = ChatService();
 
   Future<void> saveMessage(ChatHistory message) async {
     final Database db = await _databaseHelper.database;
@@ -15,6 +17,17 @@ class ChatRepository {
       message.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+    try {
+      await _chatService.saveMessage(
+        conversationId: message.conversationId.toString(),
+        messageId: message.id.toString(),
+        text: message.message,
+        isUser: message.isUser,
+        imagePath: message.imagePath,
+      );
+    } catch (_) {
+      // Ignore cloud sync failures so local storage continues to work offline.
+    }
   }
 
   Future<List<ChatHistory>> getMessages(int conversationId) async {

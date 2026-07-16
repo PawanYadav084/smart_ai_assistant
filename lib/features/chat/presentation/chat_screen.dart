@@ -25,6 +25,7 @@ import '../../../models/pdf_document.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../core/services/pdf_service.dart';
 import '../../settings/presentation/settings_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 
 
@@ -183,6 +184,40 @@ Future<void> _loadConversations() async {
 }
 
 
+  Future<void> _streamAssistantResponse(String fullReply) async {
+    final responseTime = DateTime.now();
+
+    setState(() {
+      _messages.add(
+        ChatMessage(
+          message: '',
+          isUser: false,
+          time: responseTime,
+        ),
+      );
+    });
+
+    final words = fullReply.split(' ');
+    var current = '';
+
+    for (final word in words) {
+      if (_cancelGeneration || !mounted) break;
+
+      current = current.isEmpty ? word : '$current $word';
+
+      setState(() {
+        _messages[_messages.length - 1] = ChatMessage(
+          message: current,
+          isUser: false,
+          time: responseTime,
+        );
+      });
+
+      _scrollToBottom();
+      await Future.delayed(const Duration(milliseconds: 25));
+    }
+  }
+
   Future<void> _sendMessage() async {
     if (_isTyping) return;
     _cancelGeneration = false;
@@ -279,19 +314,11 @@ Future<void> _loadConversations() async {
         return;
       }
 
-      final responseTime = DateTime.now();
+      await _streamAssistantResponse(reply);
 
       if (!mounted) return;
 
       setState(() {
-        _messages.add(
-          ChatMessage(
-            message: reply,
-            isUser: false,
-            time: responseTime,
-          ),
-        );
-
         _conversation.add(Content.model([TextPart(reply)]));
         _isTyping = false;
       });
@@ -865,6 +892,15 @@ Future<void> _loadConversations() async {
               ),
               const Divider(),
               ListTile(
+                leading: const Icon(Icons.logout),
+                title: const Text('Logout'),
+                onTap: () async {
+                  await FirebaseAuth.instance.signOut();
+                  if (!mounted) return;
+                  Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.settings_outlined),
                 title:  Text('Settings'),
                 onTap: () {
@@ -946,7 +982,7 @@ Future<void> _loadConversations() async {
                                 ),
                                 SizedBox(height: 20),
                                 Text(
-                                  "Hello Pawan 👋",
+                                  "Hello ${FirebaseAuth.instance.currentUser?.displayName ?? FirebaseAuth.instance.currentUser?.email?.split('@').first ?? 'User'} 👋",
                                   style: TextStyle(
                                     fontSize: 26,
                                     fontWeight: FontWeight.bold,

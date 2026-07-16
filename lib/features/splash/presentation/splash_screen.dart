@@ -27,7 +27,7 @@
 
 
 
-import '../../chat/presentation/chat_screen.dart';
+import '../../auth/presentation/auth_gate.dart';
 import 'package:flutter/material.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -46,7 +46,7 @@ void initState() {
       // ignore: use_build_context_synchronously
       context,
       MaterialPageRoute(
-        builder: (context) => const ChatScreen(),
+        builder: (context) => const AuthGate(),
       ),
     );
   });

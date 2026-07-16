@@ -1,21 +1,32 @@
-
-
 import 'package:sqflite/sqflite.dart';
 
 import 'conversation.dart';
 import 'database_helper.dart';
+import '../features/chat/services/chat_service.dart';
 
 class ConversationRepository {
   final DatabaseHelper _databaseHelper = DatabaseHelper.instance;
+  final ChatService _chatService = ChatService();
 
   Future<int> createConversation(Conversation conversation) async {
     final Database db = await _databaseHelper.database;
 
-    return await db.insert(
+    final id = await db.insert(
       'conversations',
       conversation.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+
+    try {
+      await _chatService.saveConversation(
+        conversationId: id.toString(),
+        title: conversation.title,
+      );
+    } catch (_) {
+      // Ignore cloud sync failures so offline mode keeps working.
+    }
+
+    return id;
   }
 
   Future<int> createNewConversation() async {
@@ -53,6 +64,15 @@ class ConversationRepository {
       where: 'id = ?',
       whereArgs: [id],
     );
+
+    try {
+      await _chatService.renameConversation(
+        conversationId: id.toString(),
+        title: title,
+      );
+    } catch (_) {
+      // Ignore cloud sync failures.
+    }
   }
 
 
@@ -126,6 +146,12 @@ class ConversationRepository {
       where: 'id = ?',
       whereArgs: [id],
     );
+
+    try {
+      await _chatService.deleteConversation(id.toString());
+    } catch (_) {
+      // Ignore cloud sync failures.
+    }
   }
 
   Future<void> deleteIfEmpty(int id) async {
