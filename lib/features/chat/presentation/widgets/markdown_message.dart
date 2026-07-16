@@ -15,6 +15,8 @@ class MarkdownMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return MarkdownBody(
       data: text,
       builders: {
@@ -46,8 +48,8 @@ class MarkdownMessage extends StatelessWidget {
           fontWeight: FontWeight.bold,
           color: textColor,
         ),
-        blockquote: const TextStyle(
-          color: Colors.grey,
+        blockquote: TextStyle(
+          color: colors.onSurfaceVariant,
           fontStyle: FontStyle.italic,
         ),
         listBullet: TextStyle(
@@ -60,8 +62,15 @@ class MarkdownMessage extends StatelessWidget {
           color: textColor,
         ),
         codeblockDecoration: BoxDecoration(
-          color: Colors.grey.shade200,
+          color: colors.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: colors.outlineVariant,
+          ),
+        ),
+        a: TextStyle(
+          color: colors.primary,
+          decoration: TextDecoration.underline,
         ),
       ),
     );

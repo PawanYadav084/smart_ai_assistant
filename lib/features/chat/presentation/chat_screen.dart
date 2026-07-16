@@ -63,7 +63,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final ChatRepository _chatRepository = ChatRepository();
   final List<Content> _conversation = [];
   List<Conversation> _conversations = [];
-  int _currentConversationId = 1;
+  int? _currentConversationId;
   final ConversationRepository _conversationRepository =
       ConversationRepository();
   final TextEditingController _searchController = TextEditingController();
@@ -103,8 +103,8 @@ bool _cancelGeneration = false;
       conversationRepository: _conversationRepository,
     );
 
-    _loadChatHistory();
     _loadConversations();
+    // _clearChatOnStartup(); // removed as per instructions
   }
   Future<void> _initTts() async {
     await _flutterTts.setLanguage('en-US');
@@ -113,8 +113,16 @@ bool _cancelGeneration = false;
   }
 
   Future<void> _loadChatHistory() async {
+    if (_currentConversationId == null) {
+      if (!mounted) return;
+      setState(() {
+        _messages.clear();
+        _conversation.clear();
+      });
+      return;
+    }
     final chatHistory = await _chatRepository.getMessages(
-      _currentConversationId,
+      _currentConversationId!,
     );
 
     if (!mounted) return;
@@ -226,8 +234,12 @@ Future<void> _loadConversations() async {
     _scrollToBottom();
 
     try {
+      if (_currentConversationId == null) {
+        _currentConversationId =
+            await _conversationRepository.createNewConversation();
+      }
       await _chatService.saveUserMessage(
-        conversationId: _currentConversationId,
+        conversationId: _currentConversationId!,
         message: userMessage,
         image: selectedImage,
       );
@@ -285,7 +297,7 @@ Future<void> _loadConversations() async {
       });
 
       await _chatService.saveAssistantMessage(
-        conversationId: _currentConversationId,
+        conversationId: _currentConversationId!,
         message: reply,
       );
 
@@ -368,15 +380,14 @@ Future<void> _loadConversations() async {
 
   Future<void> _clearChat() async {
     // Delete current conversation only if it has no messages.
-    await _conversationRepository.deleteIfEmpty(_currentConversationId);
-
-    final newConversationId = await _conversationRepository
-        .createNewConversation();
+    if (_currentConversationId != null) {
+      await _conversationRepository.deleteIfEmpty(_currentConversationId!);
+    }
 
     if (!mounted) return;
 
     setState(() {
-      _currentConversationId = newConversationId;
+      _currentConversationId = null;
       _messages.clear();
       _conversation.clear();
       _conversations.clear();
@@ -402,13 +413,21 @@ Future<void> _loadConversations() async {
 
     await _loadConversations();
 
-    if (_conversations.isNotEmpty) {
+    if (_conversations.isNotEmpty && _conversations.first.id != null) {
       _currentConversationId = _conversations.first.id!;
       _messages.clear();
       _conversation.clear();
       await _loadChatHistory();
     } else {
-      await _clearChat();
+      setState(() {
+        _currentConversationId = null;
+        _messages.clear();
+        _conversation.clear();
+        _selectedImage = null;
+        _selectedPdf = null;
+        _controller.clear();
+        _isTyping = false;
+      });
     }
   }
 
@@ -418,7 +437,7 @@ Future<void> _loadConversations() async {
     final newTitle = await showDialog<String>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Rename Conversation'),
+        title:  Text('Rename Conversation'),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -427,11 +446,11 @@ Future<void> _loadConversations() async {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child:  Text('Cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Save'),
+            child:  Text('Save'),
           ),
         ],
       ),
@@ -557,7 +576,7 @@ Future<void> _loadConversations() async {
           mainAxisSize: MainAxisSize.min,
           children: [
             const SizedBox(height: 12),
-            const Text(
+             Text(
               'Choose Image',
               style: TextStyle(
                 fontSize: 18,
@@ -566,7 +585,7 @@ Future<void> _loadConversations() async {
             ),
             ListTile(
               leading: const Icon(Icons.camera_alt),
-              title: const Text('Camera'),
+              title:  Text('Camera'),
               onTap: () {
                 Navigator.pop(context);
                 _pickImage(ImageSource.camera);
@@ -574,7 +593,7 @@ Future<void> _loadConversations() async {
             ),
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('Gallery'),
+              title:  Text('Gallery'),
               onTap: () {
                 Navigator.pop(context);
                 _pickImage(ImageSource.gallery);
@@ -638,19 +657,19 @@ Future<void> _loadConversations() async {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Start New Chat?'),
-        content: const Text('This will clear your current conversation.'),
+        title:  Text('Start New Chat?'),
+        content:  Text('This will clear your current conversation.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child:  Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
               await _clearChat();
             },
-            child: const Text('New Chat'),
+            child:  Text('New Chat'),
           ),
         ],
       ),
@@ -659,22 +678,29 @@ Future<void> _loadConversations() async {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     return Scaffold(
       drawer: Drawer(
+        backgroundColor: colors.surface,
         child: SafeArea(
           child: Column(
             children: [
-              const DrawerHeader(
+              DrawerHeader(
                 child: Center(
                   child: Text(
                     'Smart AI Assistant',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: colors.onSurface,
+                    ),
                   ),
                 ),
               ),
               ListTile(
                 leading: const Icon(Icons.add_comment_outlined),
-                title: const Text('New Chat'),
+                title:  Text('New Chat'),
                 onTap: () async {
                   Navigator.pop(context);
                   await _clearChat();
@@ -684,6 +710,12 @@ Future<void> _loadConversations() async {
               TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
+                  filled: true,
+                  fillColor: colors.surfaceContainerHighest,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
                   labelText: 'Search Chats',
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: _searchController.text.isEmpty
@@ -704,7 +736,7 @@ Future<void> _loadConversations() async {
               ),
 
               const Divider(),
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Align(
                   alignment: Alignment.centerLeft,
@@ -712,14 +744,14 @@ Future<void> _loadConversations() async {
                     'Recent Chats',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey,
+                      color: colors.onSurfaceVariant,
                     ),
                   ),
                 ),
               ),
               Expanded(
                 child: _filteredConversations.isEmpty
-                    ? const Center(child: Text('No chat history yet.'))
+                    ? Center(child: Text('No chat history yet.'))
                     : (() {
                         final grouped = _groupConversations();
                         final List<Widget> children = [];
@@ -734,9 +766,9 @@ Future<void> _loadConversations() async {
                                 alignment: Alignment.centerLeft,
                                 child: Text(
                                   entry.key,
-                                  style: const TextStyle(
+                                  style:  TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.grey,
+                                    color: colors.onSurfaceVariant,
                                   ),
                                 ),
                               ),
@@ -802,20 +834,20 @@ Future<void> _loadConversations() async {
                                   final shouldDelete = await showDialog<bool>(
                                     context: context,
                                     builder: (_) => AlertDialog(
-                                      title: const Text('Delete Conversation'),
-                                      content: const Text(
+                                      title:  Text('Delete Conversation'),
+                                      content:  Text(
                                         'Delete this conversation permanently?',
                                       ),
                                       actions: [
                                         TextButton(
                                           onPressed: () =>
                                               Navigator.pop(context, false),
-                                          child: const Text('Cancel'),
+                                          child:  Text('Cancel'),
                                         ),
                                         FilledButton(
                                           onPressed: () =>
                                               Navigator.pop(context, true),
-                                          child: const Text('Delete'),
+                                          child:  Text('Delete'),
                                         ),
                                       ],
                                     ),
@@ -834,7 +866,7 @@ Future<void> _loadConversations() async {
               const Divider(),
               ListTile(
                 leading: const Icon(Icons.settings_outlined),
-                title: const Text('Settings'),
+                title:  Text('Settings'),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
@@ -850,14 +882,20 @@ Future<void> _loadConversations() async {
         ),
       ),
       appBar: AppBar(
-        title: const Text("Smart AI Chat"),
+        backgroundColor: colors.surface,
+          foregroundColor: colors.onSurface,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+        title:  Text("Smart AI Chat"),
         centerTitle: true,
         actions: [
           IconButton(
             tooltip: _webSearchEnabled ? 'Web Search ON' : 'Web Search OFF',
-            icon: Icon(
+              icon: Icon(
               Icons.travel_explore,
-              color: _webSearchEnabled ? Colors.blue : null,
+              color: _webSearchEnabled 
+              ? colors.primary
+              : colors.onSurfaceVariant,
             ),
             onPressed: () {
               setState(() {
@@ -869,9 +907,9 @@ Future<void> _loadConversations() async {
             IconButton(
               tooltip: 'Stop',
               // icon: const Icon(Icons.stop_circle_outlined),
-              icon: const Icon(
+              icon: Icon(
                 Icons.stop,
-                color: Colors.red,
+                color: colors.error,
                 size: 28,
               ),
               onPressed: _stopGenerating,
@@ -883,6 +921,7 @@ Future<void> _loadConversations() async {
           ),
         ],
       ),
+      
       body: SafeArea(
         child: Column(
           children: [
@@ -892,16 +931,16 @@ Future<void> _loadConversations() async {
                 children: [
                   Expanded(
                     child: _messages.isEmpty
-                        ? const Center(
+                        ? Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 CircleAvatar(
                                   radius: 45,
-                                  backgroundColor: Color(0xFF2575FC),
+                                  backgroundColor: colors.primary,
                                   child: Icon(
                                     Icons.smart_toy,
-                                    color: Colors.white,
+                                    color: colors.onPrimary,
                                     size: 45,
                                   ),
                                 ),
@@ -918,7 +957,7 @@ Future<void> _loadConversations() async {
                                   "How can I help you today?",
                                   style: TextStyle(
                                     fontSize: 17,
-                                    color: Colors.grey,
+                                    color: colors.onSurfaceVariant,
                                   ),
                                 ),
                               ],

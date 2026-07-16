@@ -1,33 +1,3 @@
-// import '../../home/presentation/home_screen.dart';
-// import 'package:flutter/material.dart';
-
-// class HomeScreen extends StatelessWidget {
-//   const HomeScreen({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(
-//         title: const Text("Home"),
-//         centerTitle: true,
-//       ),
-//       body: const Center(
-//         child: Text(
-//           "Welcome Home 🎉",
-//           style: TextStyle(
-//             fontSize: 28,
-//             fontWeight: FontWeight.bold,
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-// }
-
-
-
-
-
 
 import '../../chat/presentation/chat_screen.dart';
 import '../../../shared/widgets/feature_card.dart';
@@ -38,46 +8,39 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Scaffold(
       body: Container(
         width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Color(0xFF6A11CB),
-              Color(0xFF2575FC),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
+        color: colors.surface,
         child: SafeArea(
           child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
 
               // Greeting
               Align(
                 alignment: Alignment.centerLeft,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     Text(
                       "👋 Good Morning",
                       style: TextStyle(
                         fontSize: 18,
-                        color: Colors.grey,
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
 
-                    SizedBox(height: 5),
+                    const SizedBox(height: 5),
 
                     Text(
                       "Pawan Yadav",
                       style: TextStyle(
                         fontSize: 30,
-                        color: Colors.white,
+                        color: colors.onSurface,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -87,9 +50,16 @@ class HomeScreen extends StatelessWidget {
 
               const SizedBox(height: 20),
 
-              Image.asset(
-                "assets/images/ai_logo.png",
-                width: 140,
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: colors.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Image.asset(
+                  "assets/images/ai_logo.png",
+                  width: 140,
+                ),
               ),
 
               const SizedBox(height: 30),

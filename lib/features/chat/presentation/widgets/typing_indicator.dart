@@ -42,11 +42,11 @@ class _TypingIndicatorState extends State<TypingIndicator>
 
         return Opacity(
           opacity: value >= index && value < index + 1 ? 1 : 0.3,
-          child: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 2),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
             child: CircleAvatar(
               radius: 4,
-              backgroundColor: Color(0xFF2575FC),
+              backgroundColor: Theme.of(context).colorScheme.primary,
             ),
           ),
         );
@@ -56,17 +56,18 @@ class _TypingIndicatorState extends State<TypingIndicator>
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
 
-        const CircleAvatar(
+        CircleAvatar(
           radius: 18,
-          backgroundColor: Color(0xFF2575FC),
+          backgroundColor: colors.primary,
           child: Icon(
             Icons.smart_toy,
-            color: Colors.white,
+            color: colors.onPrimary,
             size: 20,
           ),
         ),
@@ -79,8 +80,11 @@ class _TypingIndicatorState extends State<TypingIndicator>
             vertical: 14,
           ),
           decoration: BoxDecoration(
-            color: Colors.grey.shade300,
+            color: colors.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: colors.outlineVariant,
+            ),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -88,9 +92,10 @@ class _TypingIndicatorState extends State<TypingIndicator>
             children: [
               Text(
                 widget.message,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
+                  color: colors.onSurface,
                 ),
               ),
               const SizedBox(height: 8),

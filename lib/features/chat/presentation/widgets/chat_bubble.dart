@@ -27,6 +27,8 @@ class _ChatBubbleState extends State<ChatBubble> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     return Row(
       mainAxisAlignment: widget.chat.isUser
           ? MainAxisAlignment.end
@@ -46,8 +48,8 @@ class _ChatBubbleState extends State<ChatBubble> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: widget.chat.isUser
-                  ? const Color(0xFF2575FC)
-                  : Colors.grey.shade300,
+                ? colors.primary
+                : colors.surfaceContainerHighest,
               //borderRadius: BorderRadius.circular(16),
               borderRadius: BorderRadius.only(
                 topLeft: const Radius.circular(20),
@@ -74,16 +76,13 @@ class _ChatBubbleState extends State<ChatBubble> {
                   ),
                   const SizedBox(height: 8),
                 ],
-                // Text(
-                //   widget.chat.message,
-                //   style: TextStyle(
-                //     color: widget.chat.isUser ? Colors.white : Colors.black,
-                //     fontSize: 16,
-                //   ),
-                // ),
+              
                 MarkdownMessage(
                   text: widget.chat.message,
-                  textColor: widget.chat.isUser ? Colors.white : Colors.black,
+                  // textColor: widget.chat.isUser ? Colors.white : Colors.black,
+                  textColor: widget.chat.isUser
+                    ? colors.onPrimary
+                    : colors.onSurface,
                 ),
                 if (!widget.chat.isUser && widget.onSpeak != null) ...[
                   const SizedBox(height: 8),
@@ -92,7 +91,11 @@ class _ChatBubbleState extends State<ChatBubble> {
                     child: IconButton(
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
-                      icon: const Icon(Icons.volume_up, size: 20),
+                      icon: Icon(
+                        Icons.volume_up,
+                        size: 20,
+                        color: colors.onSurfaceVariant,
+                      ),
                       tooltip: 'Read aloud',
                       onPressed: widget.onSpeak,
                     ),
@@ -103,7 +106,12 @@ class _ChatBubbleState extends State<ChatBubble> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.copy_outlined, size: 20),
+                          // icon: const Icon(Icons.copy_outlined, size: 20)
+                        icon: Icon(
+                          Icons.copy_outlined,
+                          size: 20,
+                          color: colors.onSurfaceVariant,
+                        ),
                           tooltip: 'Copy message',
                           onPressed: () {
                             Clipboard.setData(
@@ -118,7 +126,11 @@ class _ChatBubbleState extends State<ChatBubble> {
                           },
                         ),
                         IconButton(
-                          icon: const Icon(Icons.refresh, size: 20),
+                        icon: Icon(
+                          Icons.refresh,
+                          size: 20,
+                          color: colors.onSurfaceVariant,
+                        ),  
                           tooltip: 'Regenerate',
                           onPressed: widget.onRegenerate,
                         ),
@@ -126,7 +138,7 @@ class _ChatBubbleState extends State<ChatBubble> {
                           icon: Icon(
                             _liked ? Icons.thumb_up : Icons.thumb_up_outlined,
                             size: 20,
-                            color: _liked ? Colors.blue : null,
+                            color: _liked ? colors.primary : colors.onSurfaceVariant,
                           ),
                           tooltip: 'Like',
                           onPressed: () {
@@ -144,7 +156,7 @@ class _ChatBubbleState extends State<ChatBubble> {
                                 ? Icons.thumb_down
                                 : Icons.thumb_down_outlined,
                             size: 20,
-                            color: _disliked ? Colors.blue : null,
+                            color: _disliked ? colors.primary : colors.onSurfaceVariant,
                           ),
                           tooltip: 'Dislike',
                           onPressed: () {
@@ -165,7 +177,9 @@ class _ChatBubbleState extends State<ChatBubble> {
                   "${widget.chat.time.hour}:${widget.chat.time.minute.toString().padLeft(2, '0')}",
                   style: TextStyle(
                     fontSize: 11,
-                    color: widget.chat.isUser ? Colors.white70 : Colors.grey,
+                    color: widget.chat.isUser
+                      ? colors.onPrimary.withOpacity(0.8)
+                      : colors.onSurfaceVariant,
                   ),
                 ),
               ],
