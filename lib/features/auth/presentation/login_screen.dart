@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'signup_screen.dart';
 import '../../chat/presentation/chat_screen.dart';
+import 'forgot_password_screen.dart';
+import 'phone_login_screen.dart';
+
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -52,6 +55,8 @@ class _LoginScreenState extends State<LoginScreen> {
             TextField(
               controller: _emailController,
               decoration: const InputDecoration(labelText: 'Email'),
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 16),
             TextField(
@@ -64,6 +69,24 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: () => setState(() => _obscure = !_obscure),
                 ),
               ),
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) {
+                if (!_loading) _login();
+              },
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ForgotPasswordScreen(),
+                    ),
+                  );
+                },
+                child: const Text('Forgot Password?'),
+              ),
             ),
             const SizedBox(height: 24),
             SizedBox(
@@ -73,6 +96,33 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: _loading
                     ? const CircularProgressIndicator()
                     : const Text('Login'),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Row(
+              children: [
+                Expanded(child: Divider()),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  child: Text('OR'),
+                ),
+                Expanded(child: Divider()),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const PhoneLoginScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.phone),
+                label: const Text('Continue with Phone Number'),
               ),
             ),
             TextButton(

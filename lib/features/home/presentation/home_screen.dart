@@ -57,7 +57,7 @@ class HomeScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: Image.asset(
-                  "assets/images/ai_logo.png",
+                  "assets/images/app_icon.png",
                   width: 140,
                 ),
               ),

@@ -20,7 +20,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 3,
+      version: 4,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -28,6 +28,7 @@ class DatabaseHelper {
         await db.execute('''
           CREATE TABLE conversations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cloud_id TEXT,
             title TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
@@ -43,6 +44,7 @@ class DatabaseHelper {
         await db.execute('''
           CREATE TABLE chat_messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cloud_id TEXT,
             conversation_id INTEGER NOT NULL,
             message TEXT NOT NULL,
             isUser INTEGER NOT NULL,
@@ -52,6 +54,16 @@ class DatabaseHelper {
             REFERENCES conversations(id)
             ON DELETE CASCADE
           )
+        ''');
+
+        await db.execute('''
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_message_unique
+          ON chat_messages(conversation_id, timestamp, isUser)
+        ''');
+
+        await db.execute('''
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_conversation_title_created
+          ON conversations(title, created_at)
         ''');
       },
       onUpgrade: (db, oldVersion, newVersion) async {
@@ -104,6 +116,30 @@ class DatabaseHelper {
             'created_at': DateTime.now().toIso8601String(),
             'updated_at': DateTime.now().toIso8601String(),
           });
+        }
+
+        await db.execute('''
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_message_unique
+          ON chat_messages(conversation_id, timestamp, isUser)
+        ''');
+
+        await db.execute('''
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_conversation_title_created
+          ON conversations(title, created_at)
+        ''');
+
+        if (oldVersion < 4) {
+          try {
+            await db.execute('ALTER TABLE conversations ADD COLUMN cloud_id TEXT');
+          } catch (_) {
+            // Column already exists.
+          }
+
+          try {
+            await db.execute('ALTER TABLE chat_messages ADD COLUMN cloud_id TEXT');
+          } catch (_) {
+            // Column already exists.
+          }
         }
       },
     );

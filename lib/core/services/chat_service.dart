@@ -10,6 +10,7 @@ import '../memory/memory_service.dart';
 import 'ai_service.dart';
 import 'gemini_service.dart';
 import 'tavily_service.dart';
+import 'sync_service.dart';
 
 class ChatService {
   ChatService({
@@ -30,6 +31,7 @@ class ChatService {
   final ChatRepository _chatRepository;
   final ConversationRepository _conversationRepository;
   final TavilyService _tavilyService = TavilyService();
+  final SyncService _syncService = SyncService.instance;
 
   Future<String> buildMemoryPrompt() async {
     final savedMemory = await _memoryService.loadMemory();
@@ -65,6 +67,21 @@ Use this information only if it is relevant to the user's request.
         imagePath: image?.path,
       ),
     );
+
+    try {
+      await _syncService.uploadMessage(
+        conversationId: conversationId.toString(),
+        messageId: DateTime.now().millisecondsSinceEpoch.toString(),
+        data: {
+          'message': message,
+          'isUser': true,
+          'imagePath': image?.path,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
+    } catch (_) {
+      // Keep local storage working even if cloud sync fails.
+    }
 
     await _conversationRepository.updateTitleIfNeeded(
       conversationId,
@@ -167,6 +184,21 @@ Provide a clear answer and include the important sources if relevant.
         timestamp: DateTime.now(),
       ),
     );
+
+    try {
+      await _syncService.uploadMessage(
+        conversationId: conversationId.toString(),
+        messageId: DateTime.now().millisecondsSinceEpoch.toString(),
+        data: {
+          'message': message,
+          'isUser': false,
+          'imagePath': null,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
+    } catch (_) {
+      // Keep local storage working even if cloud sync fails.
+    }
 
     await _conversationRepository.updateConversation(
       conversationId,

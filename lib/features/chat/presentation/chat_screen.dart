@@ -12,9 +12,12 @@ import '../../../core/services/groq_service.dart';
 import '../../../core/services/ai_service.dart';
 import '../../../core/services/fallback_ai_service.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/services/sync_service.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'dart:io';
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/services/gemini_service.dart';
 import 'widgets/message_input.dart';
@@ -52,6 +55,9 @@ class _ChatScreenState extends State<ChatScreen> {
   late stt.SpeechToText _speech;
   late FlutterTts _flutterTts;
   late ChatService _chatService;
+  final SyncService _syncService = SyncService.instance;
+
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _conversationListener;
 
   bool _isListening = false;
 
@@ -105,7 +111,24 @@ bool _cancelGeneration = false;
     );
 
     _loadConversations();
+    _restoreCloudData();
+    _startRealtimeSync();
     // _clearChatOnStartup(); // removed as per instructions
+  }
+  void _startRealtimeSync() {
+    _conversationListener?.cancel();
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    _conversationListener = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('conversations')
+        .snapshots()
+        .listen((_) async {
+          await _restoreCloudData();
+        });
   }
   Future<void> _initTts() async {
     await _flutterTts.setLanguage('en-US');
@@ -182,8 +205,18 @@ Future<void> _loadConversations() async {
     _filteredConversations = List.from(conversations);
   });
 }
+  Future<void> _restoreCloudData() async {
+    try {
+      await _syncService.restoreFromCloud();
+      await _loadConversations();
 
-
+      if (_currentConversationId != null) {
+        await _loadChatHistory();
+      }
+    } catch (e) {
+      debugPrint('Cloud restore failed: $e');
+    }
+  }
   Future<void> _streamAssistantResponse(String fullReply) async {
     final responseTime = DateTime.now();
 
@@ -1070,6 +1103,7 @@ Future<void> _loadConversations() async {
 
   @override
   void dispose() {
+    _conversationListener?.cancel();
     _speech.stop();
     _flutterTts.stop();
     _searchController.dispose();

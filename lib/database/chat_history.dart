@@ -1,5 +1,6 @@
 class ChatHistory {
   final int? id;
+  final String? cloudId;
   final int conversationId;
   final String message;
   final bool isUser;
@@ -8,6 +9,7 @@ class ChatHistory {
 
   const ChatHistory({
     this.id,
+    this.cloudId,
     required this.conversationId,
     required this.message,
     required this.isUser,
@@ -18,6 +20,7 @@ class ChatHistory {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'cloud_id': cloudId,
       'conversation_id': conversationId,
       'message': message,
       'isUser': isUser ? 1 : 0,
@@ -29,6 +32,7 @@ class ChatHistory {
   factory ChatHistory.fromMap(Map<String, dynamic> map) {
     return ChatHistory(
       id: map['id'] as int?,
+      cloudId: map['cloud_id'] as String?,
       conversationId: map['conversation_id'] as int,
       message: map['message'] as String,
       isUser: map['isUser'] == 1,

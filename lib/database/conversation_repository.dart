@@ -11,6 +11,17 @@ class ConversationRepository {
   Future<int> createConversation(Conversation conversation) async {
     final Database db = await _databaseHelper.database;
 
+    // Duplicate check
+    final existing = await db.query(
+      'conversations',
+      where: 'id = ?',
+      whereArgs: [conversation.id],
+      limit: 1,
+    );
+    if (conversation.id != null && existing.isNotEmpty) {
+      return existing.first['id'] as int;
+    }
+
     final id = await db.insert(
       'conversations',
       conversation.toMap(),
@@ -54,6 +65,12 @@ class ConversationRepository {
 
   Future<void> renameConversation(int id, String title) async {
     final Database db = await _databaseHelper.database;
+
+    // Check current title before updating
+    final current = await getConversation(id);
+    if (current == null || current.title == title) {
+      return;
+    }
 
     await db.update(
       'conversations',

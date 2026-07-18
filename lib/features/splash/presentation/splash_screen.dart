@@ -1,31 +1,3 @@
-// import 'package:flutter/material.dart';
-
-// class SplashScreen extends StatelessWidget {
-//   const SplashScreen({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return const Scaffold(
-//       body: Center(
-//         child: Text(
-//           "Smart AI Assistant",
-//           style: TextStyle(
-//             fontSize: 30,
-//             fontWeight: FontWeight.bold,
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-// }
-
-
-
-
-
-
-
-
 
 import '../../auth/presentation/auth_gate.dart';
 import 'package:flutter/material.dart';
@@ -70,7 +42,7 @@ void initState() {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Image.asset(
-              'assets/images/ai_logo.png',
+              'assets/images/app_icon.png',
               width: 150,
               height: 150,
             ),

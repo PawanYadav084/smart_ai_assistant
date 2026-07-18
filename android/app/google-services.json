@@ -12,7 +12,20 @@
           "package_name": "com.pawankumar.smartai"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "815785620616-s5q7m8kaig15qpdf9rk8h6kser5v8s4l.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.pawankumar.smartai",
+            "certificate_hash": "1eed7ba1fb947bb3d65c15651cad7503cc369f54"
+          }
+        },
+        {
+          "client_id": "815785620616-e06hvf4t46geqb7mt42s5k4avn18u3vf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyB0g3h8dLXNnrqDEhHlwmpuhsHTbWIc4PA"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "815785620616-e06hvf4t46geqb7mt42s5k4avn18u3vf.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "815785620616-3k9mtgekja37dvuo40umeqo8a6ue07u6.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.smartAiAssistant"
+              }
+            }
+          ]
         }
       }
     }
