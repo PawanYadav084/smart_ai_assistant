@@ -98,7 +98,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const AboutListTile(
             icon: Icon(Icons.info_outline),
-            applicationName: 'Smart AI Assistant',
+            applicationName: 'Nova AI',
             applicationVersion: '1.0.0',
             applicationLegalese: '© 2026 Pawan Kumar',
           ),

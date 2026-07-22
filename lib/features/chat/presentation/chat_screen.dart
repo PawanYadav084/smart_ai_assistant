@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../../../core/memory/memory_service.dart';
 import '../../../database/chat_repository.dart';
-import '../../../database/chat_history.dart';
 import '../../../database/conversation.dart';
 import '../../../database/conversation_repository.dart';
 import '../../../core/services/groq_service.dart';
@@ -749,7 +748,7 @@ Future<void> _loadConversations() async {
               DrawerHeader(
                 child: Center(
                   child: Text(
-                    'Smart AI Assistant',
+                    'Nova AI',
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,

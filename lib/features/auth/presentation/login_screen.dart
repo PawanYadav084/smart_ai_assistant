@@ -6,7 +6,6 @@ import '../services/auth_service.dart';
 import 'signup_screen.dart';
 import '../../chat/presentation/chat_screen.dart';
 import 'forgot_password_screen.dart';
-import 'phone_login_screen.dart';
 
 
 class LoginScreen extends StatefulWidget {
@@ -109,22 +108,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Expanded(child: Divider()),
               ],
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const PhoneLoginScreen(),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.phone),
-                label: const Text('Continue with Phone Number'),
-              ),
-            ),
+            // Removed PhoneLoginScreen button and preceding SizedBox
             TextButton(
               onPressed: () {
                 Navigator.push(

@@ -42,7 +42,7 @@ class _SmartAIAssistantAppState extends State<SmartAIAssistantApp> {
       builder: (context, _) {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
-          title: 'Smart AI Assistant',
+          title: 'Nova AI',
           theme: AppTheme.light,
           darkTheme: AppTheme.dark,
           themeMode: _themeService.themeMode,

@@ -50,7 +50,7 @@ void initState() {
             SizedBox(height: 25),
 
             Text(
-              "Smart AI Assistant",
+              "Nova AI",
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 30,
