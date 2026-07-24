@@ -1,4 +1,4 @@
-# smart_ai_assistant
+# Nova_AI
 
 A new Flutter project.
 
